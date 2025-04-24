@@ -8,3 +8,12 @@ run  ```pip install -r requirements.txt```.
 
 ## Experiments
 All experiments are included in ```experiements.ipynb```. 
+
+## Citation
+```
+@article{yin2025transformers,
+  title={Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data?},
+  author={Yin, Yutong and Wang, Zhaoran},
+  journal={arXiv preprint arXiv:2501.15857},
+  year={2025}
+}```
