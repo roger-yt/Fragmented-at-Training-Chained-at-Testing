@@ -4,34 +4,41 @@ import torch
 import numpy as np
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from transformers import AutoTokenizer, Trainer
+from transformers import AutoTokenizer, Trainer, TrainingArguments
 from utils.collators import My_collator
 from utils.configs import MyGPT2Config
 from data_structure_related.data_structure import Goal_graph
 from utils.networks import MyGPT2LMHeadModel
-from utils.utils import prepare_training_data, do_test, do_probe, do_plot
+from utils.utils import prepare_training_data, do_test, do_probe, do_plot_hydra
+import pickle as pkl
+import sys
 
 log = logging.getLogger(__name__)
 
 def get_dirs(cfg):
-    data_dir = f"data_and_models"
-    shape_dir = f"len{cfg.graph.len}_width{cfg.graph.width}_merge{cfg.graph.merge_pos}"
-    if not os.path.exists(f"{data_dir}/{shape_dir}"):
-            os.makedirs(f"{data_dir}/{shape_dir}")
-    foot_str = f"{shape_dir}/maxchildlen{str(cfg.graph.max_child_chain_len)}\
-_cl{cfg.data.context_lower}_cu{cfg.data.context_upper}_cd{cfg.data.context_div}_vocab{str(cfg.model.vocab_size)}_envaln{str(cfg.data.env_val_num_low)}\
-_chainvaln{str(cfg.data.chain_val_num)}_lkpn{cfg.data.leak_prob_node}_lkpv{cfg.data.leak_prob_val}\
-_addlen{cfg.data.addlen}_nearlen{cfg.data.nearlen}_tl{cfg.data.tl_low}_shot{cfg.data.max_examples}_icl{str(cfg.data.num_icl_train)}_mk{str(cfg.data.num_mk_train)}"
+    # print("cfg.paths.data_dir=", cfg.paths.data_dir)
+    model_dir = f"{cfg.paths.data_dir}/outs_{cfg.model.name}"
+    if not os.path.exists(model_dir):
+        print("Create model_dir:", model_dir)
+        os.makedirs(model_dir)
+    outs_path = f"{model_dir}/layer{cfg.model.n_layers}_head{cfg.model.n_heads}_hidden{cfg.model.hidden_size}"
+    return outs_path
 
+def get_latest_checkpoint(outs_path):
+        checkpoints = [d for d in os.listdir(outs_path) if d.startswith("checkpoint-")]
+        if len(checkpoints) == 0:
+            return None, None
+        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split("-")[1]))
+        return os.path.join(outs_path, latest_checkpoint), latest_checkpoint
 
-@hydra.main(config_path="conf", config_name="config")
+@hydra.main(config_path="configs", config_name="config_normal")
 def main(cfg: DictConfig):
     # print full config
     log.info(OmegaConf.to_yaml(cfg))
 
     # build Graph_shape
     gs = [cfg.graph.width] * cfg.graph.merge_pos + [1] + [cfg.graph.width] * (cfg.graph.len - cfg.graph.merge_pos - 1)
-    assert cfg.graph.len > cfg.graph.max_child_chain_len
+    assert cfg.graph.len > cfg.data.max_child_chain_len
 
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(cfg.tokenizer.model_name)
@@ -54,7 +61,8 @@ def main(cfg: DictConfig):
         tl_low=cfg.data.tl_low,
         tokenizer=tokenizer
     )
-    train_ds, valid_ds = prepare_training_data(gg, cfg, tokenizer, "data_and_models", ".")
+    outs_path = get_dirs(cfg)
+    train_ds, valid_ds = pkl.load(open(f"{cfg.paths.data_dir}/train.pkl", "rb")), pkl.load(open(f"{cfg.paths.data_dir}/valid.pkl", "rb"))
 
     # model & config
     context_len = 2048
@@ -72,21 +80,86 @@ def main(cfg: DictConfig):
     model = MyGPT2LMHeadModel(model_cfg).to(device)
     data_collator = My_collator(tokenizer)
 
-    # Trainer
-    trainer = Trainer(
-        model=model,
-        tokenizer=tokenizer,
-        args=cfg.trainer,
-        data_collator=data_collator,
-        train_dataset=train_ds,
-        eval_dataset=valid_ds
+    print("outs_path:", outs_path)
+    train_args = TrainingArguments(
+        output_dir=outs_path,
+        eval_strategy="epoch",
+        num_train_epochs=cfg.trainer.num_train_epochs,
+        save_steps=cfg.trainer.save_steps,
+            per_device_eval_batch_size=cfg.trainer.per_device_eval_batch_size,                                                                                                               
+            per_device_train_batch_size=cfg.trainer.per_device_train_batch_size,  
+            report_to="none",
+            gradient_accumulation_steps=cfg.trainer.gradient_accumulation_steps,
+            learning_rate=cfg.trainer.learning_rate,
     )
+    if cfg.modes.train:
+        trainer = Trainer(
+            model=model,
+            tokenizer=tokenizer,
+            args=train_args,
+            data_collator=data_collator,
+            train_dataset=train_ds,
+            eval_dataset=valid_ds
+            )
 
-    # train / resume
-    trainer.train()
+        latest_checkpoint, ckpt = get_latest_checkpoint(outs_path)
+        if latest_checkpoint is not None:
+                trainer.train(resume_from_checkpoint=True)
+        else:
+                trainer.train()
+    if cfg.modes.test or cfg.modes.probe or cfg.modes.probe:
+        if cfg.test.epoch==-1:
+               checkpoint_dirs = [d for d in os.listdir(outs_path) if d.startswith("checkpoint-")]
+               if checkpoint_dirs:
+                        latest_checkpoint = max(checkpoint_dirs, key=lambda x: int(x.split("-")[1]))
+                        model_path = os.path.join(outs_path, latest_checkpoint)
+                        test_epoch = int(latest_checkpoint.split("-")[1])
+               else:
+                        raise FileNotFoundError(f"No checkpoint directories found in {outs_path}")
+        else:
+                model_path = f"{outs_path}/checkpoint-{cfg.test.epoch}"
+                test_epoch = cfg.test.epoch
+        model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(device)
+        training_args = torch.load(f"{model_path}/training_args.bin")
+        print("training_args=", training_args)
+    
+    if cfg.modes.test:
+        trainer = Trainer(
+            model=model,
+            tokenizer=tokenizer,
+            args=train_args,
+            data_collator=data_collator,
+            train_dataset=train_ds,
+            eval_dataset=valid_ds
+        )
+        test_len = len(gs)
+        log_path = f"{outs_path}/test_epoch{test_epoch}_len{test_len}.log"
+        print("log_path:", log_path)
+        handler = logging.FileHandler(log_path, mode='w')
+        handler.setFormatter(logging.Formatter('%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s'))
+        logger = logging.getLogger('testing')
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+        logger.info(trainer.evaluate())
+        do_test(gg, model, tokenizer, cfg.data.max_examples, test_len, logger)
+    
+    if cfg.modes.probe:
+        log_path = f"{outs_path}/prob_epoch{test_epoch}_meannum{cfg.probe.mean_num}.log"
+        handler = logging.FileHandler(log_path, mode='w')
+        handler.setFormatter(logging.Formatter('%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s'))
+        logger = logging.getLogger('probing')
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
+        logger.addHandler(logging.StreamHandler(sys.stdout))
+        logger.info(f"path len={test_len}")
 
-    # testing, probing, plotting can follow similarly...
-    # e.g. do_test(…); do_probe(…); do_plot(…)
-
+        logger.info("mk probing")
+        do_probe(gg, model, tokenizer, cfg.data_max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "mk", "val")
+        
+        logger.info("test probing")
+        do_probe(gg, model, tokenizer, cfg.data_max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "test", "val")
+    if cfg.modes.plot:
+        do_plot_hydra(cfg, gg, model, tokenizer, 2, test_len,  device, train_ds, outs_path, test_epoch)
 if __name__ == "__main__":
     main()

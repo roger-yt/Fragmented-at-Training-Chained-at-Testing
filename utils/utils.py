@@ -237,6 +237,47 @@ def prepare_training_data(goal_graph, args, tokenizer, data_dir, type_dir):
         pkl.dump(Valid_tokenized_datasets, open(f"{keep_dir}/valid.pkl", "wb"))
     return pkl.load(open(f"{keep_dir}/train.pkl", "rb")), pkl.load(open(f"{keep_dir}/valid.pkl", "rb"))
 
+def prepare_training_data_hydra(goal_graph, cfg, tokenizer):
+    assert os.path.exists(cfg.paths.data_dir)
+    if not os.path.exists(f"{cfg.paths.data_dir}/train.pkl"):
+        ICL_train_traces, ICL_train_label_masks,  ml1 = goal_graph.generate_structure_icl_data(num_traces=cfg.data.num_icl_train,
+                                max_examples=cfg.data.max_examples)
+        # print("ICL_train_traces:", ICL_train_traces)
+        
+        ICL_valid_traces, ICL_valid_label_masks, ml2 = goal_graph.generate_structure_icl_data(num_traces=cfg.data.num_icl_valid,
+                                max_examples=cfg.data.max_examples)
+        mk_train_traces, mk_train_label_masks, ml3 = goal_graph.generate_mk_data(num_traces=cfg.data.num_mk_train,
+                        max_examples=cfg.data.max_examples,
+                        max_child_chain_len = cfg.data.max_child_chain_len)
+        mk_valid_traces, mk_valid_label_masks,  ml4 = goal_graph.generate_mk_data(num_traces=cfg.data.num_mk_valid,
+                        max_examples=cfg.data.max_examples,
+                        max_child_chain_len = cfg.data.max_child_chain_len)
+        context_len = max(ml1, ml2, ml3, ml4)+10
+        def tokenize_func(examples):
+            input_ids = [ inn+ [tokenizer.pad_token_id] * (context_len - len(inn)) for inn in examples["ids"]]
+            attention_mask = [[1] * len(inn) + [0] * (context_len - len(inn)) for inn in examples["ids"]]
+            label_mask = [ inn + [0]* (context_len - len(inn)) for inn in examples["labmsk"]]
+            return {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "label": label_mask,
+            }
+        Train_traces = ICL_train_traces + mk_train_traces
+        Train_label_masks = ICL_train_label_masks + mk_train_label_masks
+        Train_mapping = {"ids": Train_traces, "labmsk": Train_label_masks}
+
+        Train_ds = Dataset.from_dict(Train_mapping)
+        Train_tokenized_datasets = Train_ds.map(tokenize_func, batched=True, remove_columns=["ids", "labmsk"])
+        pkl.dump(Train_tokenized_datasets, open(f"{cfg.paths.data_dir}/train.pkl", "wb"))
+
+        Valid_traces = ICL_valid_traces + mk_valid_traces
+        Valid_label_masks = ICL_valid_label_masks + mk_valid_label_masks
+        Valid_mapping = {"ids": Valid_traces, "labmsk": Valid_label_masks}
+        Valid_ds = Dataset.from_dict(Valid_mapping)
+        Valid_tokenized_datasets = Valid_ds.map(tokenize_func, batched=True, remove_columns=["ids", "labmsk"])
+        pkl.dump(Valid_tokenized_datasets, open(f"{cfg.paths.data_dir}/valid.pkl", "wb"))
+    return pkl.load(open(f"{cfg.paths.data_dir}/train.pkl", "rb")), pkl.load(open(f"{cfg.paths.data_dir}/valid.pkl", "rb"))
+
 def do_test(goal_graph, model, tokenizer, test_max_examples, test_len, logger=None):
     res = {"whole": [], "final": [], "te_ver": [], "te_val":[], "node": [], "tr_val": [], "tr_ver": []}
     for i in range(test_max_examples): #MK_path_bounds[0][-1]-MK_path_bounds[0][0]+1
@@ -379,6 +420,60 @@ def do_plot(args, goal_graph, model, tokenizer, test_max_examples, test_len, dev
     outputs_mk = model(torch.tensor(input_ids_mk).to(model.device), output_attentions=True)
     box =  (18, 48, 18, 48) #(18, 48, 62, 92)   #(28, 59, 28, 59)  #(28, 59, 119, 150)
     for l in range(args.n_layers):
+        if l > 1:
+            break
+        for outputs, name in zip([outputs_test,  outputs_mk], ["test",  "mk"]):
+            if name == "test":
+                 box = (28, 59, 28, 59) if l == 0 else (28, 59, 119, 150)
+            elif name == "icl":
+                 box = (18, 48, 18, 48) if l == 0 else (18, 48, 62, 92)
+            plot_dir = f"{outs_path}/plot_{name}_epoch{test_epoch}"
+            if not os.path.exists(plot_dir):
+                    os.makedirs(plot_dir)
+            input_ids = input_ids_test if name=="test" else input_ids_icl if name=="icl" else input_ids_mk
+            # print(outputs.attentions[l][:,1].size())
+            attentions = torch.mean(outputs.attentions[l][0], dim=0).squeeze().detach().cpu().numpy()
+            print(attentions.shape)
+            # attentions = outputs.attentions[l][0][h].squeeze().detach().cpu().numpy()
+            ticks = [f"[{pos}]:{tokenizer.decode(ids)}" for (pos, ids) in enumerate(input_ids)]
+            plot_attention(attentions, ticks, box, f"{plot_dir}/check_layer{l}.png")
+            latex_codes = text_attention(input_ids, attentions, tokenizer, box)
+            with open(f"{plot_dir}/latex_layer{l}.txt", "w") as f:
+                f.write(latex_codes)
+
+
+def do_plot_hydra(cfg, goal_graph, model, tokenizer, test_max_examples, test_len, device, train_ds, outs_path, test_epoch):
+    child_chain = random.choice(goal_graph.all_child_chains[test_len-1])
+    begin_pos = child_chain[0]["child_pos"]
+    test_attn_pt = f"{outs_path}/test_attn.pkl"
+    if not os.path.exists(test_attn_pt):
+        input_ids_test = []
+        for i in range(test_max_examples):
+            beg_val = goal_graph.nodes[begin_pos[0]][begin_pos[1]].get_a_val()
+            trace_str_prompt = goal_graph.draw_child_chain_trace(child_chain, beg_val)["trace_full"]
+            input_ids_test += trace_str_prompt + tokenizer.encode("\n")
+        pkl.dump(input_ids_test, open(test_attn_pt, "wb"))
+    else:
+         input_ids_test = pkl.load(open(test_attn_pt, "rb"))
+    input_ids_icl = train_ds["input_ids"][2]
+    # find the first eos
+    for i in range(len(input_ids_icl)):
+        if input_ids_icl[i] == tokenizer.eos_token_id:
+            input_ids_icl = input_ids_icl[:i+1]
+            break
+    # input_ids_icl = input_ids_icl[0:100]
+    input_ids_mk = train_ds["input_ids"][-7]
+    for i in range(len(input_ids_mk)):
+        if input_ids_mk[i] == tokenizer.eos_token_id:
+            input_ids_mk = input_ids_mk[:i+1]
+            break
+    # input_ids_mk = input_ids_mk[0:100]
+    print(tokenizer.decode(input_ids_mk))
+    
+    outputs_test = model(torch.tensor(input_ids_test).to(model.device), output_attentions=True)
+    outputs_mk = model(torch.tensor(input_ids_mk).to(model.device), output_attentions=True)
+    box =  (18, 48, 18, 48) #(18, 48, 62, 92)   #(28, 59, 28, 59)  #(28, 59, 119, 150)
+    for l in range(cfg.model.n_layers):
         if l > 1:
             break
         for outputs, name in zip([outputs_test,  outputs_mk], ["test",  "mk"]):

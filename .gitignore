@@ -3,3 +3,4 @@ __pycache__
 wandb
 *__pycache__
 nodes_dir
+*.log
