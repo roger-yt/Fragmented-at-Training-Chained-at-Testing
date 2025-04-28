@@ -62,5 +62,13 @@ modes:
 
 test:
   epoch: -1
+
 probe:
   mean_num: 10
+
+draw:
+  type: standard
+  mode: main
+  parent_dir: none
+  name: acc_map_1
+  model_size: normal
