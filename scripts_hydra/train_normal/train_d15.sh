@@ -1,11 +1,10 @@
-export CUDA_VISIBLE_DEVICES="0"
-for len in 5
+export CUDA_VISIBLE_DEVICES="2"
+for len in 15
 do
 for gt in 0 1 2 3 4
 do
-for child_len in 3 2
+for child_len in 6 5 4 3 2
 do
-
 data_dir="data_and_models/normal_and_simpler/depth${len}_maxchild${child_len}/type${gt}"
 if [ ! -d "$data_dir" ]; then
   mkdir -p "$data_dir"          # -p also builds parents

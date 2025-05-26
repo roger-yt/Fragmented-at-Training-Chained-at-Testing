@@ -1,0 +1,54 @@
+# experiment settings
+hydra:
+  run:
+    dir: .
+  output_subdir: null      # ⇦ stops “.hydra/…” creation
+  job:
+    chdir: false           # ⇦ keep CWD unchanged
+  
+graph:
+  type: 0
+  len: 5
+  width: 2
+  merge_pos: 0
+
+tokenizer:
+  model_name: gpt2
+
+model:
+  n_layers: 2
+  hidden_size: 1000
+  vocab_size: 52
+  name: mlp
+  window_size: 200
+
+data:
+  max_child_chain_len: 3
+  max_examples: 5
+  num_icl_train: 5000
+  num_icl_valid: 100
+  num_mk_train: 20000
+  num_mk_valid: 100
+  context_lower: 1
+  context_upper: 7
+  context_div: 7
+  env_val_num_low: 10
+  chain_val_num: 50
+  leak_prob_node: 0.0
+  leak_prob_val: 0.0
+  addlen: 5
+  nearlen: 100
+  tl_low: 4
+
+trainer:
+  num_train_epochs: 20
+
+paths:
+  data_dir: none
+
+modes:
+  train: true
+  test: true
+
+test:
+  epoch: -1

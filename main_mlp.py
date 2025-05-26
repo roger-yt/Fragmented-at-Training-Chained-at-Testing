@@ -150,6 +150,7 @@ if not os.path.exists(model_dir):
 
 outs_path = f"{model_dir}/layer{Args.n_layers}_hidden{Args.hidden_size}_window{Args.window_size}"
 
+
 train_dataloader = DataLoader(Train_ds, batch_size=10000, shuffle=True)
 eval_dataloader = DataLoader(Valid_ds, batch_size=10000, shuffle=True)
 if Args.if_train=="y":
