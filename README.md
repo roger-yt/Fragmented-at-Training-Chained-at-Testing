@@ -4,7 +4,7 @@ The code of  [ICLR 2025] **Are Transformers Able to Reason by Connecting Separat
 It includes the code that generates the “FTCT” (Fragmented at Training, Chained at Testing) learning task and corresponding experiments. ![1](ftct.png)
 
 ## Environment Setup
-run  ```pip install -r requirements.txt```.
+Run  ```pip install -r requirements.txt```.
 
 ## Experiments
 All experiments are included in ```experiements.ipynb```. 
