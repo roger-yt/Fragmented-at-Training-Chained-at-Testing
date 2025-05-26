@@ -12,7 +12,22 @@ import numpy as np
 from matplotlib.ticker import MultipleLocator
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import re
 
+_DCPATTERN = re.compile(r'^depth(\d+)_maxchild(\d+)$')
+def parse_depth_maxchild(s: str):
+    m = _DCPATTERN.match(s)
+    if not m:
+        return None
+    depth, maxchild = m.groups()
+    return int(depth), int(maxchild)
+_TYPEPATTERN = re.compile(r'^type(\d+)$')
+def parse_type(s: str):
+    m = _TYPEPATTERN.match(s)
+    if not m:
+        return None
+    typi = m.groups()
+    return int(typi[0])
 
 @hydra.main(config_path="configs", config_name="config_normal")
 def main(cfg: DictConfig):
@@ -38,52 +53,49 @@ def main(cfg: DictConfig):
         elif cfg.draw.type == "skip":
                 acc_types = ["whole",  "final", "te_ver", "te_val"]
         name_type_map={"whole":"Whole acc", "final":"Final acc","te_val":"Values acc", "te_ver":"Vertices acc", "te_ver_comp": "Vertices acc full"}
+        dc_map = {}
+        for dir in os.listdir(cfg.draw.parent_dir):
+                d, c = parse_depth_maxchild(dir)
+                if d in dc_map.keys():
+                        dc_map[d].append(c)
+                else:
+                        dc_map[d] = [c]
+        dc_map = {k: sorted(v) for k, v in sorted(dc_map.items())}
+        print("dc_map=", dc_map)
 
-        if cfg.model.n_layers == 3:
-                width_map = {
-                        2:{5: [2, 3], 8:[2, 3, 4], 10: [2, 3, 4], 13:[2, 3, 4, 5], 15: [2, 3, 4, 6]}
-                }
+        all_child_chain_len = []
+        for key in dc_map.keys():
+                all_child_chain_len += dc_map[key]
+        all_child_chain_len = sorted(list(set(all_child_chain_len)))
 
-        if cfg.model.n_layers == 12:
-                width_map = {
-                                2:{5: [2, 3], 8:[2, 3, 4], 10: [2, 3, 4], 13:[2, 3, 4, 5], 15: [2, 3, 4, 6]}
-                                }
-        elif cfg.model.n_layers == 36:
-                width_map = {
-                                2:{5: [2, 3], 8:[2, 3, 4, 5], 10: [2, 3, 4, 5], 13:[2, 3, 4, 5, 6], 15: [2, 3, 4, 6, 7]}
-                                }
+        color_ls = ["black", "red", "green", "blue", "purple", "brown","orange" , "gray", "pink", "cyan"]
 
-        if cfg.model.mode == "main":
-                all_child_chain_len = []
-                for key in width_map.keys():
-                        for key2 in width_map[key].keys():
-                                all_child_chain_len += width_map[key][key2]
-                all_child_chain_len = sorted(list(set(all_child_chain_len)))
+        draw_dir = "draws"
+        if not os.path.exists(draw_dir):
+                os.makedirs(draw_dir)
 
-                color_ls = ["black", "red", "green", "blue", "purple", "brown","orange" , "gray", "pink", "cyan"]
-
-                draw_dir = "draws"
-                if not os.path.exists(draw_dir):
-                        os.makedirs(draw_dir)
-
-                line_proxies = []
-                labels = []
-                fig, axes = plt.subplots(len(acc_types), len(width_map[width]), figsize=(30, 15))
+        line_proxies = []
+        labels = []
+        if cfg.draw.mode == "main":
+                fig, axes = plt.subplots(len(acc_types), len(dc_map), figsize=(30, 15))
                 print("axes:", axes)
                 for o, acc_tp in enumerate(acc_types):
-                        for j, leng in enumerate(width_map[width].keys()):
-                                for k,child_chain_len in enumerate(width_map[width][leng][::-1]):
+                        for j, leng in enumerate(dc_map.keys()):
+                                for k,child_chain_len in enumerate(dc_map[leng][::-1]):
                                         gs = [1]+[width]*(leng-1)
-                                        Test_len = len(Graph_shape)
+                                        Test_len = len(gs)
                                         data_dir = f"{cfg.draw.parent_dir}/depth{leng}_maxchild{child_chain_len}"
                                         Device = "cuda" if torch.cuda.is_available() else "cpu"
                                         print("Device:", Device)
                                         curves = []
-                                        for typi in range(5):
-                                                model_dir = f"{data_dir}/type{typi}/outs_{cfg.model.name}"
+                                        # for typi in range(5):
+                                        for type_dir in os.listdir(data_dir):
+                                                model_dir = f"{data_dir}/{type_dir}/outs_{cfg.model.name}"
                                                 print("model_dir:", model_dir)
                                                 if not os.path.exists(model_dir):
                                                         continue
+                                                typi = parse_type(type_dir)
+                                                print(typi, type_dir)
                                                 gg = Goal_graph(
                                                         graph_shape=gs,
                                                         graph_type=typi,
@@ -103,10 +115,6 @@ def main(cfg: DictConfig):
                                                 outs_path = f"{model_dir}/layer{cfg.model.n_layers}_head{cfg.model.n_heads}_hidden{cfg.model.hidden_size}"
                                                 print("outs_path:", outs_path)
                                                 map_str = cfg.draw.name
-                                                if cfg.draw.type == "blur":
-                                                        map_str += "_blur"
-                                                elif cfg.draw.type == "skip":
-                                                        map_str += "_skip"+"_"+str(cfg.draw.retain_ratio)
                                                 if os.path.exists(f"{outs_path}/{map_str}.pkl"):
                                                         print("hi")
                                                         with open(f"{outs_path}/{map_str}.pkl", "rb") as f:
@@ -121,11 +129,7 @@ def main(cfg: DictConfig):
                                                         print("model_path:", model_path)
                                                         Model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(Device)
                                                         if cfg.draw.type == "standard":
-                                                                acc_map = do_test(My_Goal_graph, Model, tokenizer, cfg.data.max_examples, Test_len)
-                                                        elif cfg.draw.type == "blur":
-                                                                acc_map = do_test_blur(My_Goal_graph, Model, tokenizer, cfg.data.max_examples, Test_len)
-                                                        elif cfg.draw.type == "skip":
-                                                                acc_map = do_test_skip(My_Goal_graph, Model, tokenizer, cfg.data.max_examples, Test_len, retain_ratio=cfg.draw.retain_ratio)
+                                                                acc_map = do_test(gg, Model, tokenizer, cfg.data.max_examples, Test_len)
                                                         # acc_map = do_test(My_Goal_graph, Model, Tokenizer, Test_max_examples, Test_len)
                                                         pkl.dump(acc_map, open(f"{outs_path}/{map_str}.pkl", "wb"))
                                                 print("acc_map:", acc_map)
@@ -173,68 +177,49 @@ def main(cfg: DictConfig):
                 plt.savefig(f'fs_and_chain_len_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
 
 
-        if cfg.model.mode == "ratio":
-                all_child_chain_len = []
-                for key in width_map.keys():
-                        for key2 in width_map[key].keys():
-                                all_child_chain_len += width_map[key][key2]
-                all_child_chain_len = sorted(list(set(all_child_chain_len)))
-
-
-                color_ls = ["black", "red", "green", "blue", "purple", "cyan","orange" , "gray", "brown", "pink"]
-
-                out_maps = []
-                draw_dir = "draws"
-                if not os.path.exists(draw_dir):
-                        os.makedirs(draw_dir)
-
-                line_proxies = []
-                labels = []
+        if cfg.draw.mode == "ratio":
                 fig, axes = plt.subplots(len(acc_types), 1, figsize=(8, 10))
                 print("axes:", axes)
                 ratio_map = {}
                 for o, acc_tp in enumerate(acc_types):
-                        for j, leng in enumerate(width_map[width].keys()):
-                                for k,child_chain_len in enumerate(width_map[width][leng][::-1]):
-                                        Graph_shape = [1]+[width]*(leng-1)
-                                        Test_len = len(Graph_shape)
-                                        data_dir = f"data_and_models"
-                                        shape_dir = f"len{leng}_width{width}_merge{0}"
-                                        foot_str = f"{shape_dir}/maxchildlen{str(child_chain_len)}\
-        _cl{Args.context_lower}_cu{Args.context_upper}_cd{Args.context_div}_vocab{str(Args.vocab_size)}_envaln{str(Args.env_val_num_low)}\
-        _chainvaln{str(Args.chain_val_num)}_lkpn{Args.leak_prob_node}_lkpv{Args.leak_prob_val}\
-        _addlen{Args.addlen}_nearlen{Args.nearlen}_tl{Args.tl_low}_shot{Args.max_examples}_icl{str(Args.num_icl_train_traces)}_mk{str(Args.num_mk_train_traces)}"
-                                        data_dir = f"data_and_models"
+                        for j, leng in enumerate(dc_map.keys()):
+                                for k,child_chain_len in enumerate(dc_map[leng][::-1]):
+                                        gs = [1]+[width]*(leng-1)
+                                        Test_len = len(gs)
+                                        data_dir = f"{cfg.draw.parent_dir}/depth{leng}_maxchild{child_chain_len}"
                                         Device = "cuda" if torch.cuda.is_available() else "cpu"
                                         print("Device:", Device)
+                                        curves = []
+                                        # for typi in range(5):
                                         max_accs = []
-                                        for typi in range(5):
-                                                model_dir = f"{data_dir}/{foot_str}/type{typi}/outs_{Args.model}"
+                                        for type_dir in os.listdir(data_dir):
+                                                model_dir = f"{data_dir}/{type_dir}/outs_{cfg.model.name}"
+                                                print("model_dir:", model_dir)
                                                 if not os.path.exists(model_dir):
                                                         continue
-                                                My_Goal_graph = Goal_graph(graph_shape=Graph_shape,
-                                                                        graph_type=typi,
-                                                                context_lower=Args.context_lower,
-                                                                context_upper=Args.context_upper,
-                                                                context_div=Args.context_div,
-                                                                vocab_size=Args.vocab_size,
-                                                                env_val_num_low=Args.env_val_num_low,
-                                                                chain_val_num=Args.chain_val_num,
-                                                                        leak_prob_node=Args.leak_prob_node,
-                                                                        leak_prob_val=Args.leak_prob_val,
-                                                                addlen=Args.addlen,
-                                                                nearlen=Args.nearlen,
-                                                                tl_low=Args.tl_low,
-                                                                tokenizer=Tokenizer
-                                                                )
-                                                outs_path = f"{model_dir}/layer{Args.n_layers}_head{Args.n_heads}_hidden{Args.hidden_size}"
+                                                typi = parse_type(type_dir)
+                                                print(typi, type_dir)
+                                                gg = Goal_graph(
+                                                        graph_shape=gs,
+                                                        graph_type=typi,
+                                                        context_lower=cfg.data.context_lower,
+                                                        context_upper=cfg.data.context_upper,
+                                                        context_div=cfg.data.context_div,
+                                                        vocab_size=cfg.model.vocab_size,
+                                                        env_val_num_low=cfg.data.env_val_num_low,
+                                                        chain_val_num=cfg.data.chain_val_num,
+                                                        leak_prob_node=cfg.data.leak_prob_node,
+                                                        leak_prob_val=cfg.data.leak_prob_val,
+                                                        addlen=cfg.data.addlen,
+                                                        nearlen=cfg.data.nearlen,
+                                                        tl_low=cfg.data.tl_low,
+                                                        tokenizer=tokenizer
+                                                )
+                                                outs_path = f"{model_dir}/layer{cfg.model.n_layers}_head{cfg.model.n_heads}_hidden{cfg.model.hidden_size}"
                                                 print("outs_path:", outs_path)
-                                                map_str = Args.name
-                                                if Args.type == "blur":
-                                                        map_str += "_blur"
-                                                elif Args.type == "skip":
-                                                        map_str += "_skip"+ "_"+str(Args.retain_ratio)
+                                                map_str = cfg.draw.name
                                                 if os.path.exists(f"{outs_path}/{map_str}.pkl"):
+                                                        print("hi")
                                                         with open(f"{outs_path}/{map_str}.pkl", "rb") as f:
                                                                 acc_map = pkl.load(f)
                                                 else:
@@ -245,13 +230,10 @@ def main(cfg: DictConfig):
                                                         else:
                                                                 raise FileNotFoundError(f"No checkpoint directories found in {outs_path}")
                                                         print("model_path:", model_path)
-                                                        Model = MyGPT2LMHeadModel.from_pretrained(model_path, config=Config).to(Device)
-                                                        if Args.type == "standard":
-                                                                acc_map = do_test(My_Goal_graph, Model, Tokenizer, Test_max_examples, Test_len)
-                                                        elif Args.type == "blur":
-                                                                acc_map = do_test_blur(My_Goal_graph, Model, Tokenizer, Test_max_examples, Test_len)
-                                                        elif Args.type == "skip":
-                                                                acc_map = do_test_skip(My_Goal_graph, Model, Tokenizer, Test_max_examples, Test_len, retain_ratio=Args.retain_ratio)
+                                                        Model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(Device)
+                                                        if cfg.draw.type == "standard":
+                                                                acc_map = do_test(gg, Model, tokenizer, cfg.data.max_examples, Test_len)
+                                                        # acc_map = do_test(My_Goal_graph, Model, Tokenizer, Test_max_examples, Test_len)
                                                         pkl.dump(acc_map, open(f"{outs_path}/{map_str}.pkl", "wb"))
                                                 maxi = np.max(acc_map[acc_tp])
                                                 print(f"leng={leng}, child_chain_len={child_chain_len}, max acc={maxi}")
@@ -286,4 +268,7 @@ def main(cfg: DictConfig):
                 plt.tight_layout(rect=[0, 0, 0.95, 0.95])
 
                 # Save the figure with a grey background
-                plt.savefig(f'ratio_{Args.model_size}.png', facecolor=fig.get_facecolor())
+                plt.savefig(f'ratio_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
+
+if __name__ == "__main__":
+    main()

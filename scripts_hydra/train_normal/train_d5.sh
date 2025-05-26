@@ -6,6 +6,7 @@ do
 for child_len in 3 2
 do
 
+
 data_dir="data_and_models/normal_and_simpler/depth${len}_maxchild${child_len}/type${gt}"
 if [ ! -d "$data_dir" ]; then
   mkdir -p "$data_dir"          # -p also builds parents

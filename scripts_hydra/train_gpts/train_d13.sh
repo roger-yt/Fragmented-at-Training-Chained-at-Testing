@@ -6,7 +6,7 @@ do
 for child_len in 5 4 3 2
 do
 
-data_dir="data_and_models/larger/depth${len}_maxchild${child_len}/type${gt}"
+data_dir="data_and_models/gptsmall/depth${len}_maxchild${child_len}/type${gt}"
 if [ ! -d "$data_dir" ]; then
   mkdir -p "$data_dir"          # -p also builds parents
   echo "Created $data_dir"
