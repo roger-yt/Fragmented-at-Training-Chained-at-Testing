@@ -1,9 +1,9 @@
 export CUDA_VISIBLE_DEVICES="1"
-for len in 8
+for len in 5
 do
 for gt in 0 1 2 3 4
 do
-for child_len in 5 4 3 2
+for child_len in 3 2
 do
 
 data_dir="data_and_models/gptlarge/depth${len}_maxchild${child_len}/type${gt}"
@@ -18,7 +18,7 @@ python data_gen.py \
     data.max_child_chain_len=$child_len\
     paths.data_dir=$data_dir
 
-python main_hydra.py \
+python main.py \
      --config-name config_gptlarge.yaml\
     graph.len=$len \
     graph.type=$gt \

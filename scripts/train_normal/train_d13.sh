@@ -18,7 +18,7 @@ python data_gen.py \
     data.max_child_chain_len=$child_len\
     paths.data_dir=$data_dir
 
-python main_hydra.py \
+python main.py \
      --config-name config_normal.yaml\
     graph.len=$len \
     graph.type=$gt \

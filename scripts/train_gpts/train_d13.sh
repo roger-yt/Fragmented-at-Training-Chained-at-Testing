@@ -1,32 +1,29 @@
-export CUDA_VISIBLE_DEVICES="0"
-for len in 5
+export CUDA_VISIBLE_DEVICES="1"
+for len in 13
 do
-for gt in 0
+for gt in 0 1 2 3 4
 do
-for child_len in 3
+for child_len in 5 4 3 2
 do
-data_dir="data_and_models/normal_and_simpler/depth${len}_maxchild${child_len}/type${gt}"
+
+data_dir="data_and_models/gptsmall/depth${len}_maxchild${child_len}/type${gt}"
 if [ ! -d "$data_dir" ]; then
   mkdir -p "$data_dir"          # -p also builds parents
   echo "Created $data_dir"
 fi
 python data_gen.py \
-    --config-name config_normal.yaml\
+    --config-name config_gptsmall.yaml\
     graph.len=$len \
     graph.type=$gt \
     data.max_child_chain_len=$child_len\
     paths.data_dir=$data_dir
 
-python main_hydra.py \
-     --config-name config_normal.yaml\
+python main.py \
+     --config-name config_gptsmall.yaml\
     graph.len=$len \
     graph.type=$gt \
     data.max_child_chain_len=$child_len\
     paths.data_dir=$data_dir\
-    modes.train=false\
-    modes.test=false\
-    modes.probe=true\
-    modes.plot=false
 
 done
 done
