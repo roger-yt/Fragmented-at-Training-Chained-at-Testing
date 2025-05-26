@@ -68,7 +68,7 @@ After running the plotting command
 ### Attention Heatmap of Induction Heads
 To demonstrate the evidence of induction heads, we plot the attention heatmap of Transformers trained on FTCT with depth 13 and child chain length 6. The plotting is done by ```scripts/train_normal/plot_d13.sh```. We observe the induction heads in both training and testing data. Images will be stored in ```data_and_models/normal_and_simpler/depth13_maxchild6/type0/outs_gpt2/layer3_head3_hidden720/plot_test_epoch43750``` and ```data_and_models/normal_and_simpler/depth13_maxchild6/type0/outs_gpt2/layer3_head3_hidden720/plot_mk_epoch43750```.
 
-<img src="figures/readme/test_layer0.png" alt="drawing" width="200"/> <img src="figures/readme/test_layer1.png" alt="drawing" width="200"/> 
+<img src="figures/readme/test_layer0.png" alt="drawing" width="400"/> <img src="figures/readme/test_layer1.png" alt="drawing" width="400"/> 
 
 ### Probing to Validate the Attention Assignment
 To validate that Transformer's attention mechanism focuses on the value
