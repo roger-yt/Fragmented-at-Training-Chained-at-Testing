@@ -1,0 +1,34 @@
+export CUDA_VISIBLE_DEVICES="0"
+for len in 13
+do
+for gt in 0
+do
+for child_len in 6
+do
+
+data_dir="data_and_models/normal_and_simpler/depth${len}_maxchild${child_len}/type${gt}"
+if [ ! -d "$data_dir" ]; then
+  mkdir -p "$data_dir"          # -p also builds parents
+  echo "Created $data_dir"
+fi
+python data_gen.py \
+    --config-name config_normal.yaml\
+    graph.len=$len \
+    graph.type=$gt \
+    data.max_child_chain_len=$child_len\
+    paths.data_dir=$data_dir
+
+python main_hydra.py \
+     --config-name config_normal.yaml\
+    graph.len=$len \
+    graph.type=$gt \
+    data.max_child_chain_len=$child_len\
+    paths.data_dir=$data_dir\
+    modes.train=false\
+    modes.test=false\
+    modes.probe=false\
+    modes.plot=true
+
+done
+done
+done

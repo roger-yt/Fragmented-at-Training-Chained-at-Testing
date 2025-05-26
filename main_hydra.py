@@ -107,7 +107,7 @@ def main(cfg: DictConfig):
                 trainer.train(resume_from_checkpoint=True)
         else:
                 trainer.train()
-    if cfg.modes.test or cfg.modes.probe or cfg.modes.probe:
+    if cfg.modes.test or cfg.modes.probe or cfg.modes.plot:
         if cfg.test.epoch==-1:
                checkpoint_dirs = [d for d in os.listdir(outs_path) if d.startswith("checkpoint-")]
                if checkpoint_dirs:
@@ -121,7 +121,7 @@ def main(cfg: DictConfig):
                 test_epoch = cfg.test.epoch
         model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(device)
         training_args = torch.load(f"{model_path}/training_args.bin")
-        print("training_args=", training_args)
+        test_len = len(gs)
     
     if cfg.modes.test:
         trainer = Trainer(
@@ -132,7 +132,6 @@ def main(cfg: DictConfig):
             train_dataset=train_ds,
             eval_dataset=valid_ds
         )
-        test_len = len(gs)
         log_path = f"{outs_path}/test_epoch{test_epoch}_len{test_len}.log"
         print("log_path:", log_path)
         handler = logging.FileHandler(log_path, mode='w')
@@ -145,6 +144,7 @@ def main(cfg: DictConfig):
         do_test(gg, model, tokenizer, cfg.data.max_examples, test_len, logger)
     
     if cfg.modes.probe:
+
         log_path = f"{outs_path}/prob_epoch{test_epoch}_meannum{cfg.probe.mean_num}.log"
         handler = logging.FileHandler(log_path, mode='w')
         handler.setFormatter(logging.Formatter('%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s'))
@@ -155,11 +155,12 @@ def main(cfg: DictConfig):
         logger.info(f"path len={test_len}")
 
         logger.info("mk probing")
-        do_probe(gg, model, tokenizer, cfg.data_max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "mk", "val")
+        do_probe(gg, model, tokenizer, cfg.data.max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "mk", "val")
         
         logger.info("test probing")
-        do_probe(gg, model, tokenizer, cfg.data_max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "test", "val")
+        do_probe(gg, model, tokenizer, cfg.data.max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "test", "val")
     if cfg.modes.plot:
+        print(test_epoch)
         do_plot_hydra(cfg, gg, model, tokenizer, 2, test_len,  device, train_ds, outs_path, test_epoch)
 if __name__ == "__main__":
     main()
