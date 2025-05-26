@@ -1,5 +1,5 @@
 # Fragmented-at-Training-Chained-at-Testing
-The code of  [ICLR 2025] **Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data?** (https://arxiv.org/abs/2501.15857). 
+This is the repository of the paper [ICLR 2025] **Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data?** (https://arxiv.org/abs/2501.15857). 
 It includes the code that generates the “FTCT” (Fragmented at Training, Chained at Testing) learning task and corresponding experiments. 
 
 ## Environment Setup
@@ -18,8 +18,8 @@ python data_gen.py \
     data.max_child_chain_len=$child_len\
     paths.data_dir=$data_dir
 ```
-It generates the data according to the procedure introduced in section 3 of the paper. ![1](ftct.png)
-After running, it creates the directory ```nodes_dir``` to store the causal structure and creates the directory ```data_and_models/quick_start/depth5_maxchild3/type0/train.pkl``` to store the training data.
+It generates the data according to the procedure introduced in section 3 of the paper. ![1](figures/readme/ftct.png)
+After running, it creates the directory ```nodes_dir``` to store the causal structure and creates the directory ```data_and_models/quick_start/depth5_maxchild3/type0``` to store the training data.
 
 ### Training and Testing
 Training and testing are done by the following command.
@@ -43,9 +43,9 @@ python draw.py \
     draw.mode=main\
     draw.model_size=quick_start
 ```
-, you can draw the zero and few-shot testing performance of Transformers trained on FTCT with depth 5 and child chain length 3. 
+, you can draw the zero and few-shot testing performance of Transformers trained on FTCT with depth 5 and child chain length 3 stored. This image will be stored in the directory ```figures```.
 
-<img src="fs_and_chain_len_quick_start.png" alt="drawing" width="200"/>
+<img src="figures/readme/fs_and_chain_len_quick_start.png" alt="drawing" width="200"/>
 
 ## Replicate Experiments
 

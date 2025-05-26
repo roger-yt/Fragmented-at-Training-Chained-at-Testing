@@ -174,7 +174,7 @@ def main(cfg: DictConfig):
                 plt.tight_layout(rect=[0, 0, 0.95, 0.95])
                 # plt.show()
                 # Save the figure with a grey background
-                plt.savefig(f'fs_and_chain_len_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
+                plt.savefig(f'figures/fs_and_chain_len_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
 
 
         if cfg.draw.mode == "ratio":
@@ -268,7 +268,7 @@ def main(cfg: DictConfig):
                 plt.tight_layout(rect=[0, 0, 0.95, 0.95])
 
                 # Save the figure with a grey background
-                plt.savefig(f'ratio_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
+                plt.savefig(f'figures/ratio_{cfg.draw.model_size}.png', facecolor=fig.get_facecolor())
 
 if __name__ == "__main__":
     main()
