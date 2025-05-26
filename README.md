@@ -43,7 +43,7 @@ python draw.py \
     draw.mode=main\
     draw.model_size=quick_start
 ```
-, you can draw the zero and few-shot testing performance of Transformers trained on FTCT with depth 5 and child chain length 3 stored. This image will be stored in ```figures/fs_and_chain_len_quick_start.png```.
+, you can draw the zero and few-shot testing performance of Transformers trained on FTCT with depth 5 and child chain length 3. This image will be stored in ```figures/fs_and_chain_len_quick_start.png```.
 
 <img src="figures/readme/fs_and_chain_len_quick_start.png" alt="drawing" width="200"/>
 
