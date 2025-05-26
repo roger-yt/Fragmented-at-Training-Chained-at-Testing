@@ -71,4 +71,4 @@ draw:
   mode: main
   parent_dir: none
   name: acc_map_1
-  model_size: normal
+  model_size: gptlarge

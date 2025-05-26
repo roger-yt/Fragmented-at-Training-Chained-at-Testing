@@ -160,7 +160,7 @@ def main(cfg: DictConfig):
         logger.info("test probing")
         do_probe(gg, model, tokenizer, cfg.data.max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "test", "val")
     if cfg.modes.plot:
-        print(test_epoch)
-        do_plot_hydra(cfg, gg, model, tokenizer, 2, test_len,  device, train_ds, outs_path, test_epoch)
+        # print(test_epoch)
+        do_plot_hydra(cfg, gg, model, tokenizer, 2, test_len,  device, train_ds, outs_path, cfg.test.epoch)
 if __name__ == "__main__":
     main()
