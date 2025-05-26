@@ -9,7 +9,7 @@ from utils.collators import My_collator
 from utils.configs import MyGPT2Config
 from data_structure_related.data_structure import Goal_graph
 from utils.networks import MyGPT2LMHeadModel
-from utils.utils import prepare_training_data, do_test, do_probe, do_plot_hydra
+from utils.utils import prepare_training_data, do_test, do_probe, do_plot
 import pickle as pkl
 import sys
 
@@ -160,7 +160,6 @@ def main(cfg: DictConfig):
         logger.info("test probing")
         do_probe(gg, model, tokenizer, cfg.data.max_examples, cfg.data.max_child_chain_len, test_len, cfg.probe.mean_num, logger, device, "test", "val")
     if cfg.modes.plot:
-        # print(test_epoch)
-        do_plot_hydra(cfg, gg, model, tokenizer, 2, test_len,  device, train_ds, outs_path, cfg.test.epoch)
+        do_plot(cfg, gg, model, tokenizer, 2, test_len, train_ds, outs_path, test_epoch)
 if __name__ == "__main__":
     main()

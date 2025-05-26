@@ -70,17 +70,17 @@ def main(cfg: DictConfig):
 
         color_ls = ["black", "red", "green", "blue", "purple", "brown","orange" , "gray", "pink", "cyan"]
 
-        draw_dir = "draws"
-        if not os.path.exists(draw_dir):
-                os.makedirs(draw_dir)
-
         line_proxies = []
         labels = []
         if cfg.draw.mode == "main":
-                fig, axes = plt.subplots(len(acc_types), len(dc_map), figsize=(30, 15))
+                fig, axes = plt.subplots(len(acc_types), len(dc_map), figsize=(6*len(dc_map), 15))
                 print("axes:", axes)
                 for o, acc_tp in enumerate(acc_types):
                         for j, leng in enumerate(dc_map.keys()):
+                                if len(dc_map) == 1:
+                                        axes_obj = axes[o]
+                                elif len(dc_map) > 1:
+                                        axes_obj = axes[o][j]
                                 for k,child_chain_len in enumerate(dc_map[leng][::-1]):
                                         gs = [1]+[width]*(leng-1)
                                         Test_len = len(gs)
@@ -125,7 +125,7 @@ def main(cfg: DictConfig):
                                                                 latest_checkpoint = max(checkpoint_dirs, key=lambda x: int(x.split("-")[1]))
                                                                 model_path = os.path.join(outs_path, latest_checkpoint)
                                                         else:
-                                                                raise FileNotFoundError(f"No checkpoint directories found in {outs_path}")
+                                                                raise FileNotFoundError(f"No checkpoint directories found in {outs_path}. Please delete this directory or complete the training of this directory.")
                                                         print("model_path:", model_path)
                                                         Model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(Device)
                                                         if cfg.draw.type == "standard":
@@ -141,28 +141,28 @@ def main(cfg: DictConfig):
                                         std_curve = np.std(curves, axis=0)
                                         print("std_curve.shape:", std_curve.shape)
 
-                                        axes[o][j].plot(range(cfg.data.max_examples), mean_curve, label=f"child chain len={str(child_chain_len)}", color=color_ls[child_chain_len-2], linestyle='-', linewidth=2)
-                                        axes[o][j].fill_between(range(cfg.data.max_examples), mean_curve - std_curve, mean_curve + std_curve, color=color_ls[child_chain_len-2], alpha=0.2)
+                                        axes_obj.plot(range(cfg.data.max_examples), mean_curve, label=f"child chain len={str(child_chain_len)}", color=color_ls[child_chain_len-2], linestyle='-', linewidth=2)
+                                        axes_obj.fill_between(range(cfg.data.max_examples), mean_curve - std_curve, mean_curve + std_curve, color=color_ls[child_chain_len-2], alpha=0.2)
                                         # axes[o][j].plot(range(Args.max_examples), acc_map[acc_tp], label=f"child chain len={str(child_chain_len)}", color=color_ls[child_chain_len-2], linestyle='-', linewidth=2)
                                 if o == len(acc_types)-1:
-                                        axes[o][j].set_xlabel('Shots Num', fontsize=24, fontweight='bold')
+                                        axes_obj.set_xlabel('Shots Num', fontsize=24, fontweight='bold')
                                 if j == 0:
-                                        axes[o][j].set_ylabel(f'{name_type_map[acc_tp]}', fontsize=24, fontweight='bold')
+                                        axes_obj.set_ylabel(f'{name_type_map[acc_tp]}', fontsize=24, fontweight='bold')
                                 if o == 0:
-                                        axes[o][j].set_title(f"Depth={leng}", fontsize=24, fontweight='bold')
-                                axes[o][j].set_ylim(-0.05, 1.05)  # Ensure the range covers 0.0 to 1.0
-                                axes[o][j].set_yticks([0.0, 0.5, 1.0])  # Explicit tick marks at 0.0, 0.5, and 1.0
+                                        axes_obj.set_title(f"Depth={leng}", fontsize=24, fontweight='bold')
+                                axes_obj.set_ylim(-0.05, 1.05)  # Ensure the range covers 0.0 to 1.0
+                                axes_obj.set_yticks([0.0, 0.5, 1.0])  # Explicit tick marks at 0.0, 0.5, and 1.0
 
-                                axes[o][j].set_facecolor('lightgrey')
-                                axes[o][j].grid(True, which='both', color='white', linestyle='-', linewidth=0.7)
-                                axes[o][j].minorticks_on()
+                                axes_obj.set_facecolor('lightgrey')
+                                axes_obj.grid(True, which='both', color='white', linestyle='-', linewidth=0.7)
+                                axes_obj.minorticks_on()
 
-                                axes[o][j].xaxis.set_major_locator(MultipleLocator(1))  # Major ticks every 2 units
-                                axes[o][j].yaxis.set_major_locator(MultipleLocator(0.5))  # Major ticks every 0.5 units
-                                axes[o][j].xaxis.set_minor_locator(MultipleLocator(1))  # Minor ticks every 1 unit
-                                axes[o][j].yaxis.set_minor_locator(MultipleLocator(0.5))  # Minor ticks every 0.25 units
-                                axes[o][j].tick_params(axis='x', colors='black', direction='in', length=6, width=2, labelsize=20)
-                                axes[o][j].tick_params(axis='y', colors='black', direction='in', length=6, width=2, labelsize=20)
+                                axes_obj.xaxis.set_major_locator(MultipleLocator(1))  # Major ticks every 2 units
+                                axes_obj.yaxis.set_major_locator(MultipleLocator(0.5))  # Major ticks every 0.5 units
+                                axes_obj.xaxis.set_minor_locator(MultipleLocator(1))  # Minor ticks every 1 unit
+                                axes_obj.yaxis.set_minor_locator(MultipleLocator(0.5))  # Minor ticks every 0.25 units
+                                axes_obj.tick_params(axis='x', colors='black', direction='in', length=6, width=2, labelsize=20)
+                                axes_obj.tick_params(axis='y', colors='black', direction='in', length=6, width=2, labelsize=20)
 
                                 # Show legend
                                 # axes[o][j].legend(frameon=True, loc='upper left',bbox_to_anchor=(1.0, 1.0), fontsize=20)
@@ -228,7 +228,7 @@ def main(cfg: DictConfig):
                                                                 latest_checkpoint = max(checkpoint_dirs, key=lambda x: int(x.split("-")[1]))
                                                                 model_path = os.path.join(outs_path, latest_checkpoint)
                                                         else:
-                                                                raise FileNotFoundError(f"No checkpoint directories found in {outs_path}")
+                                                                raise FileNotFoundError(f"No checkpoint directories found in {outs_path}. Please delete this directory or complete the training of this directory.")
                                                         print("model_path:", model_path)
                                                         Model = MyGPT2LMHeadModel.from_pretrained(model_path, config=model_cfg).to(Device)
                                                         if cfg.draw.type == "standard":
