@@ -82,9 +82,11 @@ scripts/train_normal/probe_d15.sh
 
 ## Citation
 ```
-@article{yin2025transformers,
-  title={Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data?},
-  author={Yin, Yutong and Wang, Zhaoran},
-  journal={arXiv preprint arXiv:2501.15857},
-  year={2025}
+@inproceedings{
+yin2025are,
+title={Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data?},
+author={Yutong Yin and Zhaoran Wang},
+booktitle={The Thirteenth International Conference on Learning Representations},
+year={2025},
+url={https://openreview.net/forum?id=1Xg4JPPxJ0}
 }```
